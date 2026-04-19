@@ -6,7 +6,7 @@
 ## Authors
 
 |Name |Sections |
-:--------------|:------------|:---------------------------------|
+|:--------------|:------------|:---------------------------------|
 | Hanieh Jebeli| Data cleaning, EDA, Linear Model, Poisson GLM |
 | Enerel Khuyag |  Binomial GLM, GAM |
 | Aurelio Wyrsch | SVM, Neural Network, Conclusions |
