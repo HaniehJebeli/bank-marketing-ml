@@ -1,5 +1,4 @@
-# Raw data — share via Google Drive / WhatsApp, not Git
-data/cardio_train.csv
+
 
 # Saved R model objects — large binary files
 models/*.rds
