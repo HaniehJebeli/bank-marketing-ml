@@ -3,3 +3,8 @@
 .Rproj.user/
 .DS_Store
 Thumbs.db
+code/*_cache/
+code/*.html
+code/*.html
+code/*.html
+code/*.html
