@@ -216,4 +216,141 @@ cat("Saved: ../data/bank_clean.rds\n")
 cat("Enerel and Aurelio: load with readRDS('../data/bank_clean.rds')\n")
 ```
 
+---
+
+# 4. Exploratory Data Analysis
+
+*Section lead: Hanieh Jebeli*
+
+## 4.1 Subscription rate by job type
+
+```{r eda-job}
+bank_clean %>%
+  group_by(job) %>%
+  summarise(rate = mean(subscribed == "Yes")) %>%
+  arrange(desc(rate)) %>%
+  ggplot(aes(x = reorder(job, rate), y = rate, fill = rate)) +
+  geom_col(alpha = 0.85) +
+  scale_fill_gradient(low = "steelblue", high = "tomato") +
+  scale_y_continuous(labels = percent) +
+  coord_flip() +
+  labs(title = "Subscription rate by job type",
+       x = "", y = "Subscription rate") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+Students and retired clients have the highest subscription rates. Blue-collar
+and services workers show the lowest rates — likely reflecting different
+financial priorities and risk appetites.
+
+## 4.2 Age and balance distribution by outcome
+
+```{r eda-age-balance}
+p1 <- ggplot(bank_clean, aes(x = subscribed, y = age, fill = subscribed)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = c("steelblue", "tomato")) +
+  labs(title = "Age by subscription", x = "", y = "Age") +
+  theme_minimal() + theme(legend.position = "none")
+
+p2 <- ggplot(bank_clean, aes(x = subscribed, y = balance, fill = subscribed)) +
+  geom_boxplot(alpha = 0.7, outlier.size = 0.3) +
+  scale_fill_manual(values = c("steelblue", "tomato")) +
+  labs(title = "Balance by subscription", x = "", y = "Balance (euros)") +
+  theme_minimal() + theme(legend.position = "none")
+
+grid.arrange(p1, p2, ncol = 2)
+```
+
+Subscribers tend to be slightly older and have higher account balances,
+suggesting financial stability is positively associated with subscription.
+
+## 4.3 Call duration — strongest single predictor
+
+```{r eda-duration}
+ggplot(bank_clean, aes(x = duration / 60, fill = subscribed)) +
+  geom_histogram(binwidth = 1, position = "identity", alpha = 0.6) +
+  scale_fill_manual(values = c("steelblue", "tomato")) +
+  labs(title = "Call duration by subscription outcome",
+       subtitle = "Longer calls strongly associated with subscription",
+       x = "Duration (minutes)", y = "Count", fill = "Subscribed") +
+  theme_minimal()
+```
+
+Call duration is the single strongest predictor in the dataset. Customers
+who subscribed had much longer calls on average. Note: this variable cannot
+be used for prediction in a real deployment (we don't know duration before
+calling) — but it is valid for a retrospective analysis.
+
+## 4.4 Campaign contacts — count variable
+
+```{r eda-campaign}
+bank_clean %>%
+  filter(campaign <= 15) %>%
+  ggplot(aes(x = campaign, fill = subscribed)) +
+  geom_bar(position = "fill", alpha = 0.85) +
+  scale_fill_manual(values = c("steelblue", "tomato")) +
+  scale_y_continuous(labels = percent) +
+  labs(title = "Subscription rate by number of campaign contacts",
+       x = "Number of calls (campaign)", y = "Proportion",
+       fill = "Subscribed") +
+  theme_minimal()
+```
+
+Subscription rate drops sharply after 2-3 contacts. Clients contacted many
+times are much less likely to subscribe — diminishing returns are clearly visible.
+
+## 4.5 Smoother: age vs call duration
+
+```{r eda-smoother}
+ggplot(bank_clean, aes(x = age, y = duration / 60, color = subscribed)) +
+  geom_smooth(method = "loess", se = TRUE) +
+  scale_color_manual(values = c("steelblue", "tomato")) +
+  labs(title = "Call duration vs age (LOESS smoother)",
+       x = "Age (years)", y = "Duration (minutes)", color = "Subscribed") +
+  theme_minimal()
+```
+
+## 4.6 Correlation matrix
+
+```{r eda-corr}
+bank_clean %>%
+  select(age, balance, duration, campaign, previous, day) %>%
+  cor(use = "complete.obs") %>%
+  round(2) %>%
+  kable(caption = "Pearson correlations — continuous and count variables")
+```
+
+Most variables show weak mutual correlations, which is good — it means
+multicollinearity is not a major concern for the models.
+
+---
+
+# 5. Feature Engineering
+
+*Section lead: Hanieh Jebeli*
+
+```{r features}
+bank_model <- bank_clean %>%
+  mutate(
+    # Numeric target for aggregation (Poisson)
+    subscribed_num = as.integer(subscribed == "Yes"),
+
+    # Age groups for Poisson aggregation
+    age_group = cut(age,
+                    breaks = c(0, 30, 40, 50, 60, 100),
+                    labels = c("<30", "30-40", "40-50", "50-60", "60+"),
+                    right  = FALSE),
+
+    # Duration in minutes — more interpretable
+    duration_min = duration / 60,
+
+    # Education as numeric for LM
+    education_num = as.integer(education)
+  )
+
+glimpse(bank_model %>% select(subscribed_num, age_group, duration_min, education_num))
+```
+
+---
 
