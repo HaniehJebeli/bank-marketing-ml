@@ -1,0 +1,219 @@
+---
+title: "Bank Marketing - Data Cleaning, EDA, Linear Model & Poisson GLM"
+subtitle: 'Applied Machine Learning and Predictive Modelling 1 - FS26'
+author: "Hanieh Jebeli (lead), Enerel Khuyag, Aurelio Wyrsch"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo       = TRUE,
+  message    = FALSE,
+  warning    = FALSE,
+  cache      = TRUE,
+  fig.width  = 8,
+  fig.height = 5
+)
+```
+
+```{r packages}
+library(tidyverse)
+library(ggplot2)
+library(GGally)
+library(knitr)
+library(broom)
+library(gridExtra)
+library(scales)
+```
+
+---
+
+# 1. Data Source & Context
+
+*Section lead: Hanieh Jebeli*
+
+The dataset comes from the UCI Machine Learning Repository and contains records
+of **45,211 phone marketing calls** made by a Portuguese bank between May 2008
+and November 2010. Each row represents one call to one client, with 16 features
+describing the client's profile, the campaign contact history, and the outcome
+of previous campaigns.
+
+**Research question:**
+
+> *"Can we predict which bank customers will subscribe to a term deposit
+> before we call them — and what drives their decision?"*
+
+This is a practical business problem: a model that correctly identifies likely
+subscribers allows a bank to focus its marketing resources on the right people,
+reducing cost and improving conversion rates.
+
+---
+
+# 2. Data Loading & Initial Inspection
+
+*Section lead: Hanieh Jebeli*
+
+```{r load-data}
+# File uses semicolons as separator
+bank_raw <- read.csv("../data/bank-full.csv", sep = ";")
+
+dim(bank_raw)
+head(bank_raw, 5)
+str(bank_raw)
+```
+
+The raw dataset has **`r nrow(bank_raw)` rows** and **`r ncol(bank_raw)` columns**.
+
+| Variable   | Type        | Description                                                   |
+|:-----------|:------------|:--------------------------------------------------------------|
+| `age`      | Continuous  | Client age in years                                           |
+| `job`      | Categorical | Type of job (12 levels)                                       |
+| `marital`  | Categorical | Marital status (married, single, divorced)                    |
+| `education`| Categorical | Education level (primary, secondary, tertiary, unknown)       |
+| `default`  | Binary      | Has credit in default? (yes/no)                               |
+| `balance`  | Continuous  | Average yearly balance in euros                               |
+| `housing`  | Binary      | Has housing loan? (yes/no)                                    |
+| `loan`     | Binary      | Has personal loan? (yes/no)                                   |
+| `contact`  | Categorical | Contact type (cellular, telephone, unknown)                   |
+| `day`      | Continuous  | Last contact day of month                                     |
+| `month`    | Categorical | Last contact month (jan-dec)                                  |
+| `duration` | Continuous  | Last call duration in seconds                                 |
+| `campaign` | **Count**   | Number of contacts during this campaign                       |
+| `pdays`    | Continuous  | Days since last contact (-1 = never contacted before)        |
+| `previous` | **Count**   | Number of contacts before this campaign                       |
+| `poutcome` | Categorical | Outcome of previous campaign (success, failure, other, unknown)|
+| `y`        | Binary      | **Target** — subscribed? (yes/no)                            |
+
+---
+
+# 3. Data Cleaning
+
+*Section lead: Hanieh Jebeli*
+
+## 3.1 Recode and engineer variables
+
+```{r recode}
+bank <- bank_raw %>%
+  mutate(
+    # Target: yes/no -> factor
+    subscribed = factor(y, levels = c("no", "yes"),
+                        labels = c("No", "Yes")),
+
+    # Job: 12 levels — satisfies course 3+ categorical requirement
+    job = factor(job),
+
+    # Marital: 3 levels
+    marital = factor(marital,
+                     levels = c("single", "married", "divorced")),
+
+    # Education: 4 ordered levels
+    education = factor(education,
+                       levels = c("unknown", "primary", "secondary", "tertiary"),
+                       ordered = TRUE),
+
+    # Binary variables as proper factors
+    default = factor(default, levels = c("no", "yes")),
+    housing = factor(housing, levels = c("no", "yes")),
+    loan    = factor(loan,    levels = c("no", "yes")),
+
+    # Contact type
+    contact = factor(contact),
+
+    # Month as ordered factor
+    month = factor(month,
+                   levels = c("jan","feb","mar","apr","may","jun",
+                              "jul","aug","sep","oct","nov","dec"),
+                   ordered = TRUE),
+
+    # Previous campaign outcome
+    poutcome = factor(poutcome,
+                      levels = c("unknown","other","failure","success")),
+
+    # pdays: -1 means never contacted — recode to NA for clarity
+    pdays_clean = ifelse(pdays == -1, NA, pdays),
+
+    # Flag: was client contacted before this campaign?
+    prev_contacted = factor(ifelse(previous == 0, "No", "Yes")),
+
+    # log balance — balance is an amount variable, needs log transform for LM
+    # some balances are negative (overdraft) — shift first
+    balance_shifted = balance - min(balance) + 1,
+    log_balance     = log(balance_shifted)
+  ) %>%
+  select(-y)   # drop original target — we use 'subscribed' instead
+
+glimpse(bank)
+```
+
+## 3.2 Missing values
+
+```{r missing}
+colSums(is.na(bank))
+```
+
+No missing values in the original columns. The `pdays_clean` column has NAs by
+design — these represent clients who were never contacted before this campaign
+(coded as -1 in the raw data). This is expected and handled correctly.
+
+## 3.3 Check for outliers
+
+```{r outliers}
+# Campaign: number of contacts — check for unreasonable values
+cat("campaign range:", range(bank$campaign), "\n")
+cat("campaign > 30: ", sum(bank$campaign > 30), "rows\n")
+
+# Duration: call length in seconds
+cat("duration range:", range(bank$duration), "\n")
+cat("duration = 0:  ", sum(bank$duration == 0), "rows\n")
+
+# Balance: can be negative (overdraft) — that is valid
+cat("balance range:", range(bank$balance), "\n")
+```
+
+```{r remove-outliers}
+cat("Rows before cleaning:", nrow(bank), "\n")
+
+bank_clean <- bank %>%
+  filter(
+    campaign <= 30,    # more than 30 calls to one client is a data error
+    duration > 0       # duration = 0 means call never happened — remove
+  )
+
+cat("Rows after cleaning: ", nrow(bank_clean), "\n")
+cat("Rows removed:        ", nrow(bank) - nrow(bank_clean), "\n")
+```
+
+## 3.4 Dataset summary
+
+```{r summary}
+summary(bank_clean %>%
+          select(age, balance, duration, campaign, previous))
+```
+
+```{r target-balance}
+bank_clean %>%
+  count(subscribed) %>%
+  mutate(pct = paste0(round(100 * n / sum(n), 1), "%")) %>%
+  kable(caption = "Target variable distribution")
+```
+
+The classes are **imbalanced** — around 88% did not subscribe and 12% did.
+This is realistic for marketing data and will need to be considered when
+evaluating model performance (accuracy alone is not enough — we will use AUC).
+
+## 3.5 Save cleaned data for teammates
+
+```{r save}
+saveRDS(bank_clean, "../data/bank_clean.rds")
+cat("Saved: ../data/bank_clean.rds\n")
+cat("Enerel and Aurelio: load with readRDS('../data/bank_clean.rds')\n")
+```
+
+
