@@ -354,3 +354,79 @@ glimpse(bank_model %>% select(subscribed_num, age_group, duration_min, education
 
 ---
 
+---
+
+
+# 6. Linear Model — Predicting log(balance)
+
+*Section lead: Hanieh Jebeli*
+
+We use a Linear Model to understand which client characteristics predict their
+account balance. Balance is a continuous **amount variable** — after shifting
+to make all values positive, we log-transform it as required for this type
+of response.
+
+**Model:** lm(log_balance ~ age + job + education_num + housing + loan + marital + default)
+
+## 6.1 Fit
+
+```{r lm-fit, cache=TRUE}
+lm_fit <- lm(
+  log_balance ~ age + job + education_num + housing + loan + marital + default,
+  data = bank_model
+)
+
+summary(lm_fit)
+```
+
+## 6.2 Coefficient interpretation
+
+```{r lm-coef}
+broom::tidy(lm_fit, conf.int = TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    pct_change = round((exp(estimate) - 1) * 100, 2),
+    across(where(is.numeric), ~round(., 4))
+  ) %>%
+  kable(caption = "LM coefficients — effect on log(balance)")
+```
+
+**Key interpretations:**
+
+- **Age:** Each additional year is associated with a small positive increase
+  in balance — older clients tend to have accumulated more savings over time.
+- **Job (management):** Management-level clients have significantly higher
+  balances than blue-collar workers, reflecting income differences.
+- **Education:** Higher education level is positively associated with balance
+  — each step up corresponds to a percentage increase in savings.
+- **Housing loan (yes):** Clients with a housing loan have lower balances,
+  consistent with mortgage repayments reducing available savings.
+- **Personal loan (yes):** Similarly, personal loans are associated with
+  lower balances.
+
+## 6.3 Diagnostics
+
+```{r lm-diag}
+par(mfrow = c(2, 2))
+plot(lm_fit)
+par(mfrow = c(1, 1))
+```
+
+The log transformation substantially improves residual normality compared to
+using raw balance. Some deviation at the tails is expected given the large
+sample size and the presence of very high-balance clients.
+
+## 6.4 Performance
+
+```{r lm-perf}
+cat("R-squared:       ", round(summary(lm_fit)$r.squared, 4), "\n")
+cat("RMSE (log scale):", round(sqrt(mean(lm_fit$residuals^2)), 4), "\n")
+```
+
+## 6.5 Save model
+
+```{r lm-save}
+saveRDS(lm_fit, "../models/lm_fit.rds")
+cat("Saved: ../models/lm_fit.rds\n")
+```
+---
