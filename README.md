@@ -5,11 +5,11 @@
 
 ## Authors
 
-| Name              | Role       | Sections                                      |
-|:------------------|:-----------|:----------------------------------------------|
-| Hanieh Jebeli     | Student 1  | Data cleaning, EDA, Linear Model, Poisson GLM |
-| Enerel Khuyag     | Student 2  | Binomial GLM, GAM                             |
-| Aurelio Wyrsch    | Student 3  | SVM, Neural Network, Conclusions              |
+| Name              | Sections                                                      |
+|:------------------|:--------------------------------------------------------------|
+| Hanieh Jebeli     | Data Cleaning, EDA, Linear Model, Poisson GLM                |
+| Enerel Khuyag     | Binomial GLM, Generalized Additive Model (GAM)               |
+| Aurelio Wyrsch    | Support Vector Machine (SVM), Neural Network, Conclusions    |
 
 ---
 
@@ -68,26 +68,25 @@ File: `data/bank-full.csv` (semicolon-separated, 45,211 rows x 17 columns)
 ## Folder Structure
 
 ```
-Jebeli_Khuyag_Wyrsch_MATRICULATION/
-│
+
+
 ├── data/
 │   ├── bank-full.csv              # Raw data
 │   └── bank_clean.rds             # Cleaned data saved by Hanieh's Rmd
 │
 ├── code/
-│   ├── 01_Hanieh_cleaning_LM_Poisson.Rmd   # Hanieh — run FIRST
-│   ├── 02_Enerel_binomial_GAM.Rmd           # Enerel — run second
-│   ├── 03_Aurelio_SVM_NN_conclusions.Rmd    # Aurelio — run third
-│   └── main_report.Rmd                      # Final combined report
+│   ├── 01_Hanieh_cleaning_LM_Poisson.Rmd   
+│   ├── 02_Enerel_binomial_GAM.Rmd          
+│   ├── 03_Aurelio_SVM_NN_conclusions.Rmd    
+│   └── main_report.Rmd                     
 │
 ├── models/
-│   ├── lm_fit.rds                 # Saved by Hanieh
-│   ├── poisson_fit.rds            # Saved by Hanieh
-│   ├── binomial_fit.rds           # Saved by Enerel
-│   ├── gam_fit.rds                # Saved by Enerel
-│   ├── svm_fit.rds                # Saved by Aurelio
-│   └── nn_fit.rds                 # Saved by Aurelio
-│
+│   ├── lm_fit.rds                 
+│   ├── poisson_fit.rds            
+│   ├── binomial_fit.rds           
+│   ├── gam_fit.rds                
+│   ├── svm_fit.rds                
+│   └── nn_fit.rds                 
 ├── output/
 │   └── main_report.html           # Final compiled report
 │
