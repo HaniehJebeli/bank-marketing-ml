@@ -118,7 +118,7 @@ tune_grid <- expand.grid(
 
 ## 4.3 Training
 
-In the training, the model is evaluated using the 5-fold cross validation and grid search defined earlier. The combination that achieves the highest ROC is automatically selected as the final model. In total, 100 models are trained and compared in this process. Due to the computational demands of training a model 100 times on a large dataset, only a stratified 30% subsample of **bank_train** was used for to speed up the process.
+In the training, the model is evaluated using the 5-fold cross validation and grid search defined earlier. The combination that achieves the highest ROC is automatically selected as the final model. In total, 100 models are trained and compared in this process. Because of the class imbalance, a weighting was also added. Due to the computational demands of training a model 100 times on a large dataset, only a stratified 30% subsample of **bank_train** was used for to speed up the process.
 
 **Model:** svm(subscribed ~ . , data = bank_train_small, kernel = "radial", gamma = x, cost = y), 
 
@@ -145,7 +145,7 @@ bank_svm <- train(
 )
 ```
 
-```{r traine-results-svm}
+```{r train-results-svm}
 bank_svm$results
 plot(bank_svm)
 ```
