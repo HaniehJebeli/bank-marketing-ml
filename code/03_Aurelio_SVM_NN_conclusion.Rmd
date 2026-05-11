@@ -35,6 +35,7 @@ library(gridExtra)
 library(scales)
 library(e1071)
 library(caret)
+library(pROC)
 library(nnet)
 ```
 
@@ -43,17 +44,27 @@ library(nnet)
 # 1. Load
 
 ```{r load, include=FALSE}
-bank_clean <- readRDS("../data/bank_clean.rds") %>% 
+bank_clean <- readRDS("../data/bank_clean.rds")
+```
+
+---
+
+# 2. Feature Selection
+
+...
+
+```{r feature-selection,}
+bank_clean <- bank_clean %>% 
   select(-duration, -pdays_clean, -prev_contacted, -balance_shifted, -log_balance)
 ```
 
 ---
 
-# 2. Train/Test Split
+# 3. Train/Test Split
 
 *Section lead: Aurelio Wyrsch*
 
-To evaluate how well a model generalizes to unseen data, we split ***bank_clean** into a training set (80%) and a test set (20%). Since the target variable **subscribed** is heavily imbalanced — 88.3% "No" vs 11.7% "Yes" — a simple random split risks under-representing subscribers in one of the sets. We therefore use stratified sampling via createDataPartition(), which preserves the class proportions of subscribed in both the training and test set, ensuring neither set is accidentally dominated by one class.
+To evaluate how well a model generalizes unseen data, we split **bank_clean** into a training set (80%) and a test set (20%). Since the target variable **subscribed** is heavily imbalanced — around 88% "No" vs 12% "Yes" — a simple random split risks under-representing subscribers in one of the sets. We therefore use stratified sampling via **createDataPartition()**, which preserves the class proportions of subscribed in both the training and test set, ensuring neither set is accidentally dominated by one class.
 
 ```{r train-test-split}
 set.seed(123)
@@ -73,94 +84,227 @@ bank_test_truth <- bank_clean %>%
 
 ---
 
-# 2. Support Vector Machine (SVM) - Predicting subscribed
+# 4. Support Vector Machine (SVM) - Predicting subscribed
 
-...
+*Section lead: Aurelio Wyrsch*
 
-**Model:** svm(subscribed ~ . , data = bank_train, kernel = "radial", cost = 10)
+Support Vector Machines are well-suited for binary classification tasks. Our target variable subscribed is binary (Yes/No), representing whether a client agreed to a term deposit during a phone campaign. By training an SVM to identify which clients are most likely to subscribe, the bank can prioritize its outreach towards high-probability leads — reducing campaign costs and improving conversion rates. Clients flagged as unlikely to subscribe can still be contacted if the budget allows, but resources are allocated more efficiently by targeting the most promising candidates first.
 
-# 2.1. Cross Validation
+## 4.1. Cross Validation
 
-```{r cv-svm}
+To evaluate the SVM reliably, we use a 5-fold cross validation. Rather than evaluating the model on a single validation set, 5-fold cross validation splits the data into 5 folds, iteratively training on 4 folds and validating on the remaining fold. This process repeats 5 times so that every observation is used for validation exactly once. The result is a more stable and unbiased estimate of model performance compared to a single train/validation split.
+
+```{r cross-validation-svm}
 ctrl_svm <- trainControl(
   method = "cv",      
-  number = 3,     
+  number = 5,     
   classProbs = TRUE,
   summaryFunction = twoClassSummary,
-  savePredictions = TRUE,
-  verboseIter     = TRUE 
+  savePredictions = TRUE
+  # verboseIter     = TRUE 
 )
 ```
 
-# 2.2. Tune
+## 4.2. Hyperparameter Tuneing
 
-```{r tune-svm}
+To optimize the SVM's performance, we tune two hyperparameters using a grid search. The grid search tests 20 combinations across cost = (0.01, 0.05, 0.1, 0.5, 1) and gamma = (0.05, 0.1, 0.5, 1), training and evaluating a separate model for each combination.
+
+```{r hyperparameter-tuning-svm}
 tune_grid <- expand.grid(
-  C     = c(0.01, 0.1, 1),
-  sigma = c(0.001, 0.01, 0.1)
+  C     = c(0.01, 0.05, 0.1, 0.5, 1),
+  sigma = c(0.05, 0.1, 0.5, 1) # gamma is called sigma in the caret package for svmRadial
 )
+```
 
+## 4.3 Training
+
+In the training, the model is evaluated using the 5-fold cross validation and grid search defined earlier. The combination that achieves the highest ROC is automatically selected as the final model. In total, 100 models are trained and compared in this process. Due to the computational demands of training a model 100 times on a large dataset, only a stratified 30% subsample of **bank_train** was used for to speed up the process.
+
+**Model:** svm(subscribed ~ . , data = bank_train_small, kernel = "radial", gamma = x, cost = y), 
+
+- x = c(0.05, 0.1, 0.5, 1) 
+- y = c(0.01, 0.05, 0.1, 0.5, 1)
+
+Out of all the combinations, the highest ROC score was achieved with cost = 0.05 and gamma = 0.05 at 0.7259016.
+
+```{r train-svm}
 set.seed(123)
-small_indices <- createDataPartition(bank_train$subscribed, p = 0., list = F)
+small_indices <- createDataPartition(bank_train$subscribed, p = 0.3, list = F)
 bank_train_small <- bank_train %>% slice(small_indices)
 
 set.seed(123)
 bank_svm <- train(
   subscribed ~ .,
-  data       = bank_train,
+  data       = bank_train_small,
   method     = "svmRadial",
   trControl  = ctrl_svm,
   tuneGrid   = tune_grid,
   metric     = "ROC",
   preProcess = c("center", "scale"),
-  weights    = ifelse(bank_train$subscribed == "Yes", 7.5, 1)
+  weights = ifelse(bank_train_small$subscribed == "Yes", 7.5, 1)
 )
+```
 
+```{r traine-results-svm}
 bank_svm$results
-
 plot(bank_svm)
 ```
 
-## 2.3 Evalute
+## 4.4 Evaluting
+
+The SVM model achieved an overall accuracy of 89.2%, which appears strong at first glance but is misleading given the class imbalance in the dataset, because if the model would classify all data points as "No", it would also achieve an accuracy of around 88%. The balanced accuracy of 0.567 — barely above the random guessing baseline of 0.5 — reveals the model's true weakness. While the model correctly identifies 99.1% of non-subscribers (Sensitivity), it only identifies 14.2% of actual subscribers (Specificity), meaning it misses approximately 86% of clients who would have agreed to a term deposit. This is reflected in the AUC of 0.726, indicating only fair discriminative ability between the two classes.
 
 ```{r evaluate-svm}
 pred_svm <- factor(as.character(predict(bank_svm, bank_test)),
                    levels = c("No", "Yes"))
 
 cm_svm <- confusionMatrix(pred_svm, bank_test_truth)
-cm_svm
+
+pred_svm_prob <- predict(bank_svm, bank_test, type = "prob")
+roc_svm       <- roc(bank_test_truth, pred_svm_prob[, "Yes"])
+auc_svm       <- as.numeric(auc(roc_svm))
+
+svm_metrics <- data.frame(
+  Metric = c("Accuracy", "Sensitivity", "Specificity", 
+             "Balanced Accuracy", "AUC"),
+  Value  = round(c(
+    cm_svm$overall["Accuracy"],
+    cm_svm$byClass["Sensitivity"],
+    cm_svm$byClass["Specificity"],
+    cm_svm$byClass["Balanced Accuracy"],
+    auc_svm
+  ), 3)
+)
+
+kable(svm_metrics, 
+      caption = "SVM Model Performance Metrics",
+      row.names = FALSE)
+
+cm_plot_data <- as.data.frame(cm_svm$table) %>%
+  mutate(
+    label = case_when(
+      Prediction == "No"  & Reference == "No"  ~ "True Negative",
+      Prediction == "Yes" & Reference == "Yes" ~ "True Positive",
+      Prediction == "Yes" & Reference == "No"  ~ "False Positive",
+      Prediction == "No"  & Reference == "Yes" ~ "False Negative"
+    )
+  )
+
+
+ggplot(cm_plot_data, aes(x = Reference, y = Prediction, fill = label)) +
+  geom_tile(color = "white", linewidth = 1.5) +
+  geom_text(aes(label = paste0(label, "\n n = ", Freq)),
+            size = 5, fontface = "bold", color = "white") +
+  scale_fill_manual(values = c(
+    "True Positive"  = "#2ecc71",
+    "True Negative"  = "#2ecc71",
+    "False Positive" = "#e74c3c",
+    "False Negative" = "#e74c3c"
+  )) +
+  labs(
+    title    = "Confusion Matrix — SVM",
+    x        = "Actual",
+    y        = "Predicted"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
 ```
 
 ---
 
-# 3. Neural Networks - Predicting subscribed
+# 5. Neural Networks - Predicting subscribed
+
+*Section lead: Aurelio Wyrsch*
+
+Like SVM, neural networks can be used on classification tasks. By using the attributes as input nodes and the target variable **subscribed** as the output node, a neural network can learn complex, non-linear relationships between the features and the likelihood of subscription. This allows the bank to capture subtle patterns in the data that may indicate a client's propensity to subscribe, enabling more accurate predictions and better targeting of marketing efforts.
+
+## 5.1 Training
+
+Unlike for SVM, this time we don't use cross validation and hyperparameter tuning. Instead, we directly train a single model on the full training set. To address the class imbalance, we apply class weights during training, like we did for SVM, giving more importance to the minority class (subscribers) to help the model learn from those examples.
+s
+**Model:** nnet(subscribed ~ . , data = bank_train, size = 8, decay = 0.1, maxit = 500, weights = nnt_weights, trace = FALSE)
+
+```{r train-nnt}
+nnt_weights <- ifelse(bank_train$subscribed == "Yes", 7.5, 1)
+
+set.seed(123)
+bank_nnt <- nnet(subscribed ~ . , data = bank_train, size = 8, decay = 0.1, maxit = 500, weights = nnt_weights, trace = FALSE)
+```
+
+## 5.2 Evaluating
+
+At a first glance, it looks like the neural network performed worse than the SVM, because the accuracy is now only 80.1%. Also the sensitivity is less with only 82.2% compared to 99.1% from SVM. However, the neural network outperforms the SVM across the other metrics, confirming that it is better suited for this classification task. The balanced accuracy of 0.734 represents a substantial improvement over the SVM's 0.567, indicating the model is now meaningfully distinguishing between subscribers and non-subscribers rather than defaulting to the majority class. As mentioned, he sensitivity of the model correctly identifies 82.2% of non-subscribers, while the specificity now successfully catches 64.6% of actual subscribers — a dramatic improvement over the SVM's 14.2%.
+
+From a business perspective, the confusion matrix reveals a more nuanced picture. Of the 2,105 clients the model flagged as likely subscribers, 683 were true positives (actual subscribers) and 1,422 were false positives (non-subscribers incorrectly identified as likely subscribers), yielding a precision of approximately 32%. While this may seem low, it still represents a meaningful improvement over random targeting. In the original dataset, only 1 in 7 clients (12%) actually subscribed — by focusing exclusively on the clients flagged by the model, the bank would expect a successful call roughly every 3 attempts, more than doubling the baseline conversion rate. This means the model, despite its limitations, can still add practical value by helping the bank allocate its marketing resources more efficiently and reduce the number of unproductive calls.
+
+```{r evaluate-nnt}
+pred_nnt <- factor(as.character(predict(bank_nnt, bank_test, type = "class")),
+                   levels = c("No", "Yes"))
+
+cm_nnt <- confusionMatrix(pred_nnt, bank_test_truth)
+
+pred_nnt_prob <- predict(bank_nnt, bank_test, type = "raw")
+roc_nnt       <- roc(bank_test_truth, pred_nnt_prob[, 1])
+auc_nnt       <- as.numeric(auc(roc_nnt))
+
+nnt_metrics <- data.frame(
+  Metric = c("Accuracy", "Sensitivity", "Specificity",
+             "Balanced Accuracy", "AUC"),
+  Value  = round(c(
+    cm_nnt$overall["Accuracy"],
+    cm_nnt$byClass["Sensitivity"],
+    cm_nnt$byClass["Specificity"],
+    cm_nnt$byClass["Balanced Accuracy"],
+    auc_nnt
+  ), 3)
+)
+
+kable(nnt_metrics,
+      caption   = "Neural Network Model Performance Metrics",
+      row.names = FALSE)
+
+cm_plot_data_nnt <- as.data.frame(cm_nnt$table) %>%
+  mutate(
+    label = case_when(
+      Prediction == "No"  & Reference == "No"  ~ "True Negative",
+      Prediction == "Yes" & Reference == "Yes" ~ "True Positive",
+      Prediction == "Yes" & Reference == "No"  ~ "False Positive",
+      Prediction == "No"  & Reference == "Yes" ~ "False Negative"
+    )
+  )
+
+ggplot(cm_plot_data_nnt, aes(x = Reference, y = Prediction, fill = label)) +
+  geom_tile(color = "white", linewidth = 1.5) +
+  geom_text(aes(label = paste0(label, "\n n = ", Freq)),
+            size = 5, fontface = "bold", color = "white") +
+  scale_fill_manual(values = c(
+    "True Positive"  = "#2ecc71",
+    "True Negative"  = "#2ecc71",
+    "False Positive" = "#e74c3c",
+    "False Negative" = "#e74c3c"
+  )) +
+  labs(
+    title    = "Confusion Matrix — Neural Network",
+    x        = "Actual",
+    y        = "Predicted"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
+```
+
+---
+
+# 6. AI Usage
+
+*Section lead: Aurelio Wyrsch*
 
 ...
 
-## 3.1 Train
-
-```{r train-nnt}
-set.seed(123)
-bank_nnt <- nnet(subscribed ~ . , data = bank_train, size = 5, decay = 0.1, maxit = 200)
-```
-
-# 3.2 Test
-
-```{r test-nnt}
-bank_test_pred_nnt <- predict(bank_nnt, bank_test, type = "class")
-```
-
-# 3.3 Evaluate
-
-```{r evaluate-nnt}
-bank_test_pred_nnt <- factor(bank_test_pred_nnt, levels = c("No", "Yes"))
-
-confusionMatrix(bank_test_pred_nnt, bank_truth)
-```
-
 ---
 
-# 4. Summary
+# 7. Conclusion
 
+*Section lead: Aurelio Wyrsch*
 
+...
 
