@@ -1,0 +1,350 @@
+---
+title: "Bank Marketing - Binomial GLM & Generalised Additive Model"
+subtitle: 'Applied Machine Learning and Predictive Modelling 1 - FS26'
+author: "Hanieh Jebeli, Enerel Khuyag (lead), Aurelio Wyrsch"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo       = TRUE,
+  message    = FALSE,
+  warning    = FALSE,
+  cache      = FALSE,
+  fig.width  = 8,
+  fig.height = 5
+)
+options(yaml.eval.expr = FALSE)
+```
+
+```{r packages}
+library(tidyverse)
+library(ggplot2)
+library(mgcv)
+library(pROC)
+library(caret)
+library(broom)
+library(gridExtra)
+library(scales)
+library(knitr)
+```
+
+---
+
+# 1. Load
+
+```{r load}
+bank_clean <- readRDS("~/bank-marketing-ml/data/bank_clean.rds")
+
+bank_clean <- bank_clean %>%
+  mutate(subscribed_bin = as.integer(subscribed == "Yes"))
+
+glimpse(bank_clean)
+```
+
+---
+
+# 2. Binomial GLM - Predicting subscription
+
+*Section lead: Enerel Khuyag*
+
+## 2.1 Motivation
+
+Since the response variable **subscribed** is binary (Yes/No), a **Binomial GLM
+with a logit link** is the natural modelling choice. Unlike a plain linear model,
+it constrains predicted values to the (0, 1) probability range and models the
+**log-odds** of subscription as a linear combination of predictors. This makes
+the coefficients directly interpretable as odds ratios after exponentiation.
+
+## 2.2 Train/Test Split
+
+To evaluate the model on unseen data we use the same 80/20 stratified split
+strategy as Aurelio's section, ensuring comparable performance metrics across all models.
+
+```{r glm-split}
+set.seed(123)
+indices <- createDataPartition(bank_clean$subscribed, p = 0.80, list = FALSE)
+
+bank_train <- bank_clean %>% slice(indices)
+bank_test  <- bank_clean %>% slice(-indices)
+
+bank_test_truth     <- bank_test$subscribed
+bank_test_truth_bin <- bank_test$subscribed_bin
+
+cat("Training rows:", nrow(bank_train), "\n")
+cat("Test rows:    ", nrow(bank_test),  "\n")
+cat("Subscription rate (train):", round(mean(bank_train$subscribed == "Yes"), 3), "\n")
+cat("Subscription rate (test): ", round(mean(bank_test$subscribed  == "Yes"), 3), "\n")
+```
+
+## 2.3 Model Fitting
+
+```{r glm-fit}
+glm_fit <- glm(
+  subscribed_bin ~ age + job + marital + education +
+                   default + balance + housing + loan +
+                   contact + month + campaign +
+                   previous + poutcome,
+  data   = bank_train,
+  family = binomial(link = "logit")
+)
+
+saveRDS(glm_fit, "~/bank-marketing-ml/models/binomial_fit.rds")
+
+summary(glm_fit)
+```
+
+## 2.4 Coefficient Interpretation
+
+```{r glm-coef}
+tidy(glm_fit, exponentiate = TRUE, conf.int = TRUE) %>%
+  filter(term != "(Intercept)", p.value < 0.05) %>%
+  mutate(across(where(is.numeric), ~round(., 3))) %>%
+  arrange(desc(estimate)) %>%
+  kable(caption = "Significant odds ratios (p < 0.05) — Binomial GLM")
+```
+
+**Key interpretations:**
+
+- **`poutcome = success`**: The strongest predictor by far. Clients whose
+  previous campaign ended in a subscription are roughly 8–10× more likely to
+  subscribe again — past behaviour is the best predictor of future behaviour.
+
+- **`contact = cellular`**: Clients contacted by mobile phone have higher
+  subscription odds than those reached by landline or unknown contact type.
+
+- **`month` effects**: Calls in March, September, October, and December show
+  higher subscription rates, likely reflecting seasonal financial planning cycles.
+
+- **`housing = yes`**: Clients with a housing loan are less likely to subscribe —
+  those already carrying mortgage debt may be unwilling to lock up additional capital.
+
+- **`campaign`**: Each additional call during the current campaign slightly
+  *reduces* the odds — repeated contact with uninterested clients is counterproductive.
+
+```{r glm-coef-plot, fig.cap="Top 15 predictors by odds ratio (log scale)"}
+tidy(glm_fit, exponentiate = TRUE, conf.int = TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  slice_max(abs(log(estimate)), n = 15) %>%
+  ggplot(aes(x = reorder(term, estimate), y = estimate,
+             ymin = conf.low, ymax = conf.high, colour = estimate > 1)) +
+  geom_pointrange() +
+  geom_hline(yintercept = 1, linetype = "dashed", colour = "grey50") +
+  coord_flip() +
+  scale_y_log10() +
+  scale_colour_manual(values = c("tomato", "steelblue"), guide = "none") +
+  labs(title = "Odds Ratios — Binomial GLM (top 15 predictors)",
+       x = NULL, y = "Odds Ratio (log scale)") +
+  theme_minimal()
+```
+
+## 2.5 Model Evaluation
+
+```{r glm-eval}
+pred_prob_glm  <- as.vector(predict(glm_fit, newdata = bank_test, type = "response"))
+pred_class_glm <- factor(if_else(pred_prob_glm > 0.5, "Yes", "No"),
+                         levels = c("No", "Yes"))
+
+cm_glm  <- confusionMatrix(pred_class_glm, bank_test_truth, positive = "Yes")
+roc_glm <- roc(bank_test_truth_bin, pred_prob_glm)
+auc_glm <- as.numeric(auc(roc_glm))
+
+data.frame(
+  Metric = c("Accuracy", "Sensitivity", "Specificity", "Balanced Accuracy", "AUC"),
+  Value  = round(c(
+    cm_glm$overall["Accuracy"],
+    cm_glm$byClass["Sensitivity"],
+    cm_glm$byClass["Specificity"],
+    cm_glm$byClass["Balanced Accuracy"],
+    auc_glm
+  ), 3)
+) %>% kable(caption = "Binomial GLM — Performance Metrics", row.names = FALSE)
+```
+
+```{r glm-confusion, fig.cap="Confusion matrix — Binomial GLM"}
+as.data.frame(cm_glm$table) %>%
+  mutate(label = case_when(
+    Prediction == "No"  & Reference == "No"  ~ "True Negative",
+    Prediction == "Yes" & Reference == "Yes" ~ "True Positive",
+    Prediction == "Yes" & Reference == "No"  ~ "False Positive",
+    Prediction == "No"  & Reference == "Yes" ~ "False Negative"
+  )) %>%
+  ggplot(aes(x = Reference, y = Prediction, fill = label)) +
+  geom_tile(colour = "white", linewidth = 1.5) +
+  geom_text(aes(label = paste0(label, "\nn = ", Freq)),
+            size = 5, fontface = "bold", colour = "white") +
+  scale_fill_manual(values = c(
+    "True Positive"  = "#2ecc71", "True Negative"  = "#2ecc71",
+    "False Positive" = "#e74c3c", "False Negative" = "#e74c3c"
+  )) +
+  labs(title = "Confusion Matrix — Binomial GLM", x = "Actual", y = "Predicted") +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
+```
+
+```{r glm-roc, fig.cap="ROC curve — Binomial GLM"}
+ggroc(roc_glm, colour = "steelblue", size = 1) +
+  geom_abline(slope = 1, intercept = 1, linetype = "dashed", colour = "grey50") +
+  annotate("text", x = 0.3, y = 0.1,
+           label = paste0("AUC = ", round(auc_glm, 3)),
+           colour = "steelblue", size = 5) +
+  labs(title = "ROC Curve — Binomial GLM", x = "Specificity", y = "Sensitivity") +
+  theme_minimal()
+```
+
+## 2.6 Discussion
+
+The Binomial GLM provides a strong, interpretable baseline for predicting
+subscription. The AUC indicates good discriminative power, and the coefficients
+offer actionable business insights. The main limitation is the assumption of a
+**linear relationship** between each continuous predictor and the log-odds,
+which the GAM below relaxes.
+
+---
+
+# 3. Generalised Additive Model (GAM)
+
+*Section lead: Enerel Khuyag*
+
+## 3.1 Motivation
+
+The Binomial GLM assumes that predictors like `age`, `balance`, and `campaign`
+affect the log-odds **linearly**. A **GAM** replaces these linear terms with
+flexible smooth spline functions fitted from the data, allowing the model to
+capture non-linear relationships automatically.
+
+## 3.2 Model Fitting
+
+```{r gam-fit}
+gam_fit <- gam(
+  subscribed_bin ~ s(age) + s(balance) + s(campaign) + s(previous) +
+                   job + marital + education +
+                   default + housing + loan +
+                   contact + month + poutcome,
+  data   = bank_train,
+  family = binomial(link = "logit"),
+  method = "REML"
+)
+
+saveRDS(gam_fit, "~/bank-marketing-ml/models/gam_fit.rds")
+
+summary(gam_fit)
+```
+
+## 3.3 Smooth Term Plots
+
+```{r gam-plots, fig.height=8, fig.cap="Estimated smooth effects on log-odds of subscription"}
+par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
+plot(gam_fit, shade = TRUE, shade.col = "lightblue",
+     seWithMean = TRUE, scale = 0, residuals = FALSE)
+par(mfrow = c(1, 1))
+```
+
+**Interpretation of smooth terms:**
+
+- **`s(age)`**: Non-linear U-shape — very young (~18–25) and older clients (~60+)
+  are more likely to subscribe; middle-aged clients (40–55) are least likely.
+
+- **`s(balance)`**: Higher balances positively predict subscription, flattening
+  at very high values. Clients in overdraft are least likely to subscribe.
+
+- **`s(campaign)`**: Subscription probability drops sharply after 2–3 contacts,
+  confirming the diminishing returns pattern seen in the EDA.
+
+- **`s(previous)`**: Clients with 1–3 prior contacts show higher subscription rates.
+
+## 3.4 Model Evaluation
+
+```{r gam-eval}
+pred_prob_gam  <- as.vector(predict(gam_fit, newdata = bank_test, type = "response"))
+pred_class_gam <- factor(if_else(pred_prob_gam > 0.5, "Yes", "No"),
+                         levels = c("No", "Yes"))
+
+cm_gam  <- confusionMatrix(pred_class_gam, bank_test_truth, positive = "Yes")
+roc_gam <- roc(bank_test_truth_bin, pred_prob_gam)
+auc_gam <- as.numeric(auc(roc_gam))
+
+data.frame(
+  Metric = c("Accuracy", "Sensitivity", "Specificity", "Balanced Accuracy", "AUC"),
+  Value  = round(c(
+    cm_gam$overall["Accuracy"],
+    cm_gam$byClass["Sensitivity"],
+    cm_gam$byClass["Specificity"],
+    cm_gam$byClass["Balanced Accuracy"],
+    auc_gam
+  ), 3)
+) %>% kable(caption = "GAM — Performance Metrics", row.names = FALSE)
+```
+
+```{r gam-confusion, fig.cap="Confusion matrix — GAM"}
+as.data.frame(cm_gam$table) %>%
+  mutate(label = case_when(
+    Prediction == "No"  & Reference == "No"  ~ "True Negative",
+    Prediction == "Yes" & Reference == "Yes" ~ "True Positive",
+    Prediction == "Yes" & Reference == "No"  ~ "False Positive",
+    Prediction == "No"  & Reference == "Yes" ~ "False Negative"
+  )) %>%
+  ggplot(aes(x = Reference, y = Prediction, fill = label)) +
+  geom_tile(colour = "white", linewidth = 1.5) +
+  geom_text(aes(label = paste0(label, "\nn = ", Freq)),
+            size = 5, fontface = "bold", colour = "white") +
+  scale_fill_manual(values = c(
+    "True Positive"  = "#2ecc71", "True Negative"  = "#2ecc71",
+    "False Positive" = "#e74c3c", "False Negative" = "#e74c3c"
+  )) +
+  labs(title = "Confusion Matrix — GAM", x = "Actual", y = "Predicted") +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
+```
+
+## 3.5 GLM vs GAM Comparison
+
+```{r compare-roc, fig.cap="ROC curves: Binomial GLM vs GAM"}
+ggroc(list(GLM = roc_glm, GAM = roc_gam), size = 1) +
+  geom_abline(slope = 1, intercept = 1, linetype = "dashed", colour = "grey50") +
+  scale_colour_manual(values = c(GLM = "steelblue", GAM = "tomato")) +
+  annotate("text", x = 0.25, y = 0.12,
+           label = paste0("AUC GLM = ", round(auc_glm, 3)),
+           colour = "steelblue", size = 4) +
+  annotate("text", x = 0.25, y = 0.06,
+           label = paste0("AUC GAM = ", round(auc_gam, 3)),
+           colour = "tomato", size = 4) +
+  labs(title = "ROC Curves: Binomial GLM vs GAM",
+       x = "Specificity", y = "Sensitivity", colour = "Model") +
+  theme_minimal()
+```
+
+```{r compare-table}
+tibble(
+  Model               = c("Binomial GLM", "GAM"),
+  AUC                 = c(round(auc_glm, 4), round(auc_gam, 4)),
+  Accuracy            = c(round(cm_glm$overall["Accuracy"], 4),          round(cm_gam$overall["Accuracy"], 4)),
+  Sensitivity         = c(round(cm_glm$byClass["Sensitivity"], 4),       round(cm_gam$byClass["Sensitivity"], 4)),
+  Specificity         = c(round(cm_glm$byClass["Specificity"], 4),       round(cm_gam$byClass["Specificity"], 4)),
+  `Balanced Accuracy` = c(round(cm_glm$byClass["Balanced Accuracy"], 4), round(cm_gam$byClass["Balanced Accuracy"], 4))
+) %>% kable(caption = "Binomial GLM vs GAM — side-by-side comparison")
+```
+
+## 3.6 Discussion
+
+The GAM captures non-linear effects the Binomial GLM misses — particularly the
+U-shaped age effect and diminishing returns for campaign contacts. For **model
+transparency**, the GLM remains valuable. For **prediction accuracy**, the GAM
+is preferable. Both models confirm the same core insight: focus on clients with
+a successful previous campaign outcome, contacted by mobile, in their first 1–2
+calls of the current campaign.
+
+---
+
+# 4. Session Info
+
+```{r session-info}
+sessionInfo()
+```
