@@ -356,8 +356,6 @@ glimpse(bank_model %>% select(subscribed_num, age_group, duration_min, education
 
 ---
 
----
-
 
 # 6. Linear Model - Predicting log(balance)
 
