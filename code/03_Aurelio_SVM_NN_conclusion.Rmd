@@ -298,6 +298,8 @@ ggplot(cm_plot_data_nnt, aes(x = Reference, y = Prediction, fill = label)) +
 
 *Section lead: Aurelio Wyrsch*
 
+AI mainly helped with structuring the data cleaning process and speeding up coding tasks such as factor recoding and mutate() operations. It was also useful for understanding concepts like the offset term in the Poisson GLM, which I then verified using the course materials.
+Some suggestions required manual checking. For example, AI initially recommended a log transformation of balance without considering negative values, so I adjusted the approach by creating a shifted balance variable.
 ...
 
 ---
