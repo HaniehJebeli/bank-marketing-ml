@@ -12,19 +12,7 @@ output:
     df_print: paged
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(
-  echo       = TRUE,
-  message    = FALSE,
-  warning    = FALSE,
-  cache      = FALSE,
-  fig.width  = 8,
-  fig.height = 5
-)
-options(yaml.eval.expr = FALSE)
-```
-
-```{r packages}
+```{r packages-02, include=FALSE}
 library(tidyverse)
 library(ggplot2)
 library(mgcv)
@@ -36,12 +24,8 @@ library(scales)
 library(knitr)
 ```
 
----
-
-# 1. Load
-
-```{r load}
-bank_clean <- readRDS("~/bank-marketing-ml/data/bank_clean.rds")
+```{r load-02, include=FALSE}
+bank_clean <- readRDS("../data/bank_clean.rds")
 
 bank_clean <- bank_clean %>%
   mutate(subscribed_bin = as.integer(subscribed == "Yes"))
@@ -49,13 +33,11 @@ bank_clean <- bank_clean %>%
 glimpse(bank_clean)
 ```
 
----
-
-# 2. Binomial GLM - Predicting subscription
+# 9. Binomial GLM - Predicting subscription
 
 *Section lead: Enerel Khuyag*
 
-## 2.1 Motivation
+## 9.1 Motivation
 
 Since the response variable **subscribed** is binary (Yes/No), a **Binomial GLM
 with a logit link** is the natural modelling choice. Unlike a plain linear model,
@@ -63,7 +45,7 @@ it constrains predicted values to the (0, 1) probability range and models the
 **log-odds** of subscription as a linear combination of predictors. This makes
 the coefficients directly interpretable as odds ratios after exponentiation.
 
-## 2.2 Train/Test Split
+## 9.2 Train/Test Split
 
 To evaluate the model on unseen data we use the same 80/20 stratified split
 strategy as Aurelio's section, ensuring comparable performance metrics across all models.
@@ -84,9 +66,9 @@ cat("Subscription rate (train):", round(mean(bank_train$subscribed == "Yes"), 3)
 cat("Subscription rate (test): ", round(mean(bank_test$subscribed  == "Yes"), 3), "\n")
 ```
 
-## 2.3 Model Fitting
+## 9.3 Model Fitting
 
-```{r glm-fit}
+```{r glm-fit, results='hide'}
 glm_fit <- glm(
   subscribed_bin ~ age + job + marital + education +
                    default + balance + housing + loan +
@@ -96,12 +78,12 @@ glm_fit <- glm(
   family = binomial(link = "logit")
 )
 
-saveRDS(glm_fit, "~/bank-marketing-ml/models/binomial_fit.rds")
+saveRDS(glm_fit, "../models/binomial_fit.rds")
 
 summary(glm_fit)
 ```
 
-## 2.4 Coefficient Interpretation
+## 9.4 Coefficient Interpretation
 
 ```{r glm-coef}
 tidy(glm_fit, exponentiate = TRUE, conf.int = TRUE) %>%
@@ -145,7 +127,7 @@ tidy(glm_fit, exponentiate = TRUE, conf.int = TRUE) %>%
   theme_minimal()
 ```
 
-## 2.5 Model Evaluation
+## 9.5 Model Evaluation
 
 ```{r glm-eval}
 pred_prob_glm  <- as.vector(predict(glm_fit, newdata = bank_test, type = "response"))
@@ -199,7 +181,7 @@ ggroc(roc_glm, colour = "steelblue", size = 1) +
   theme_minimal()
 ```
 
-## 2.6 Discussion
+## 9.6 Discussion
 
 The Binomial GLM provides a strong, interpretable baseline for predicting
 subscription. The AUC indicates good discriminative power, and the coefficients
@@ -209,20 +191,20 @@ which the GAM below relaxes.
 
 ---
 
-# 3. Generalised Additive Model (GAM)
+# 10. Generalised Additive Model (GAM)
 
 *Section lead: Enerel Khuyag*
 
-## 3.1 Motivation
+## 10.1 Motivation
 
 The Binomial GLM assumes that predictors like `age`, `balance`, and `campaign`
 affect the log-odds **linearly**. A **GAM** replaces these linear terms with
 flexible smooth spline functions fitted from the data, allowing the model to
 capture non-linear relationships automatically.
 
-## 3.2 Model Fitting
+## 10.2 Model Fitting
 
-```{r gam-fit}
+```{r gam-fit, results='hide'}
 gam_fit <- gam(
   subscribed_bin ~ s(age) + s(balance) + s(campaign) + s(previous) +
                    job + marital + education +
@@ -233,12 +215,12 @@ gam_fit <- gam(
   method = "REML"
 )
 
-saveRDS(gam_fit, "~/bank-marketing-ml/models/gam_fit.rds")
+saveRDS(gam_fit, "../models/gam_fit.rds")
 
 summary(gam_fit)
 ```
 
-## 3.3 Smooth Term Plots
+## 10.3 Smooth Term Plots
 
 ```{r gam-plots, fig.height=8, fig.cap="Estimated smooth effects on log-odds of subscription"}
 par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
@@ -260,7 +242,7 @@ par(mfrow = c(1, 1))
 
 - **`s(previous)`**: Clients with 1–3 prior contacts show higher subscription rates.
 
-## 3.4 Model Evaluation
+## 10.4 Model Evaluation
 
 ```{r gam-eval}
 pred_prob_gam  <- as.vector(predict(gam_fit, newdata = bank_test, type = "response"))
@@ -304,7 +286,7 @@ as.data.frame(cm_gam$table) %>%
   theme(legend.position = "none")
 ```
 
-## 3.5 GLM vs GAM Comparison
+## 10.5 GLM vs GAM Comparison
 
 ```{r compare-roc, fig.cap="ROC curves: Binomial GLM vs GAM"}
 ggroc(list(GLM = roc_glm, GAM = roc_gam), size = 1) +
@@ -332,7 +314,7 @@ tibble(
 ) %>% kable(caption = "Binomial GLM vs GAM — side-by-side comparison")
 ```
 
-## 3.6 Discussion
+## 10.6 Discussion
 
 The GAM captures non-linear effects the Binomial GLM misses — particularly the
 U-shaped age effect and diminishing returns for campaign contacts. For **model
@@ -343,8 +325,6 @@ calls of the current campaign.
 
 ---
 
-# 4. Session Info
-
-```{r session-info}
+```{r session-info, include=FALSE}
 sessionInfo()
 ```

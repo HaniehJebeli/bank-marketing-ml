@@ -12,20 +12,7 @@ output:
     df_print: paged
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(
-  echo       = TRUE,
-  message    = FALSE,
-  warning    = FALSE,
-  cache      = TRUE,
-  fig.width  = 8,
-  fig.height = 5
-)
-options(yaml.eval.expr = FALSE)
-knitr::opts_knit$set(aliases = NULL)
-```
-
-```{r packages}
+```{r packages-01, include=FALSE}
 library(tidyverse)
 library(ggplot2)
 library(GGally)
@@ -370,7 +357,7 @@ of response.
 
 ## 6.1 Fit
 
-```{r lm-fit, cache=TRUE}
+```{r lm-fit, cache=TRUE, results='hide'}
 lm_fit <- lm(
   log_balance ~ age + job + education_num + housing + loan + marital + default,
   data = bank_model
