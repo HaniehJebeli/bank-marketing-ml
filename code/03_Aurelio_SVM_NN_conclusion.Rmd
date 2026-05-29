@@ -210,6 +210,13 @@ ggplot(cm_plot_data, aes(x = Reference, y = Prediction, fill = label)) +
   theme(legend.position = "none")
 ```
 
+## 4.5 Save Model
+
+```{r svm-save}
+saveRDS(bank_svm, "../models/svm_fit.rds")
+cat("Saved: ../models/svm_fit.rds\n")
+```
+
 ---
 
 # 5. Neural Networks - Predicting subscribed
@@ -221,7 +228,7 @@ Like SVM, neural networks can be used on classification tasks. By using the attr
 ## 5.1 Training
 
 Unlike for SVM, this time we don't use cross validation and hyperparameter tuning. Instead, we directly train a single model on the full training set. To address the class imbalance, we apply class weights during training, like we did for SVM, giving more importance to the minority class (subscribers) to help the model learn from those examples.
-s
+
 **Model:** nnet(subscribed ~ . , data = bank_train, size = 8, decay = 0.1, maxit = 500, weights = nnt_weights, trace = FALSE)
 
 ```{r train-nnt}
@@ -292,6 +299,12 @@ ggplot(cm_plot_data_nnt, aes(x = Reference, y = Prediction, fill = label)) +
   theme(legend.position = "none")
 ```
 
+## 5.3 Save Model
+
+```{r nnt-save}
+saveRDS(bank_nnt, "../models/nn_fit.rds")
+cat("Saved: ../models/nn_fit.rds\n")
+```
 ---
 
 # 6. AI Usage

@@ -1,0 +1,35 @@
+---
+title: "Bank Marketing - Full Report"
+subtitle: 'Applied Machine Learning and Predictive Modelling 1 - FS26'
+author: "Hanieh Jebeli, Enerel Khuyag, Aurelio Wyrsch"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo       = TRUE,
+  message    = FALSE,
+  warning    = FALSE,
+  cache      = TRUE,
+  fig.width  = 8,
+  fig.height = 5
+)
+options(yaml.eval.expr = FALSE)
+knitr::opts_knit$set(aliases = NULL)
+```
+
+```{r child="01_Hanieh_cleaning_LM_Poisson.Rmd"}
+```
+
+```{r child="02_Enerel_binomial_GAM.Rmd"}
+```
+
+```{r child="03_Aurelio_SVM_NN_conclusion.Rmd"}
+```
