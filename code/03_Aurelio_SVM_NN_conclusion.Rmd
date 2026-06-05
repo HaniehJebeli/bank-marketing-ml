@@ -299,9 +299,20 @@ AI was primarily used to speed up repetitive coding tasks such as writing visual
 
 # 14. Conclusion
 
-LM ...
+The **Linear Model** showed that job type, education, and loan status are
+significantly associated with balance. Management and tertiary-educated clients
+hold substantially higher balances — these are financially stronger profiles
+more likely to have capacity to invest.
 
-GLM ...
+The **Poisson GLM** revealed a U-shaped age effect: clients under 30 and
+above 60 subscribe at the highest rates. Education amplifies this effect —
+tertiary-educated clients across all age groups subscribe more. Housing loans
+consistently reduce subscription rates, suggesting that existing financial
+commitments are a key barrier.
+
+Together, these two models suggest that the bank should prioritise young and
+older clients with higher education and no housing loan — and be cautious about
+over-contacting middle-aged clients who are the least responsive segment.
 
 All four classification models were evaluated on the same held-out test set. The Binomial GLM and GAM performed similarly, achieving high accuracy (89%) but very low sensitivity (17–18%), meaning they correctly identified only a small fraction of actual subscribers. This is a direct consequence of the class imbalance — without any adjustment, both models default to predicting "No" for the vast majority of clients. The SVM, despite using class weights, showed similarly poor sensitivity (14.2%) and the lowest AUC (0.729), likely due to being trained on only 30% of the training data for computational reasons.
 
