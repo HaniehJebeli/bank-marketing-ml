@@ -22,6 +22,18 @@ library(gridExtra)
 library(scales)
 ```
 
+```{r setup-01, include=FALSE}
+knitr::opts_chunk$set(
+  echo       = TRUE,
+  message    = FALSE,
+  warning    = FALSE,
+  cache      = TRUE,
+  fig.width  = 6,
+  fig.height = 3,
+  results    = 'hide'
+)
+```
+
 ---
 
 # 1. Data Source & Context
@@ -143,7 +155,7 @@ glimpse(bank)
 
 ## 3.2 Missing values
 
-```{r missing}
+```{r missing, results='hide'}
 colSums(is.na(bank))
 ```
 
@@ -154,7 +166,7 @@ design - these represent clients who were never contacted before this campaign
 ## 3.3 Check for outliers
 We remove two types of impossible values: calls with `campaign > 30` (data entry errors) and calls with `duration = 0` (calls that never took place).
 
-```{r outliers}
+```{r outliers, results='hide'}
 # Campaign: number of contacts - check for unreasonable values
 cat("campaign range:", range(bank$campaign), "\n")
 cat("campaign > 30: ", sum(bank$campaign > 30), "rows\n")
@@ -167,7 +179,7 @@ cat("duration = 0:  ", sum(bank$duration == 0), "rows\n")
 cat("balance range:", range(bank$balance), "\n")
 ```
 
-```{r remove-outliers}
+```{r remove-outliers, results='markup'}
 cat("Rows before cleaning:", nrow(bank), "\n")
 
 bank_clean <- bank %>%
@@ -180,14 +192,14 @@ cat("Rows after cleaning: ", nrow(bank_clean), "\n")
 cat("Rows removed:        ", nrow(bank) - nrow(bank_clean), "\n")
 ```
 
-## 3.4 Dataset summary
+3.4 Dataset summary
 
-```{r summary}
+```{r summary, results='hide'}
 summary(bank_clean %>%
           select(age, balance, duration, campaign, previous))
 ```
 
-```{r target-balance}
+```{r target-balance, results='asis'}
 bank_clean %>%
   count(subscribed) %>%
   mutate(pct = paste0(round(100 * n / sum(n), 1), "%")) %>%
@@ -307,7 +319,7 @@ ggplot(bank_clean, aes(x = age, y = duration / 60, color = subscribed)) +
 ## 4.6 Correlation matrix
 We compute Pearson correlations among the continuous and count variables to check for multicollinearity.
 
-```{r eda-corr}
+```{r eda-corr, results='asis'}
 bank_clean %>%
   select(age, balance, duration, campaign, previous, day) %>%
   cor(use = "complete.obs") %>%
@@ -326,7 +338,7 @@ We create four derived variables used across all models: a binary numeric target
 
 *Section lead: Hanieh Jebeli*
 
-```{r features}
+```{r features, results='hide'}
 bank_model <- bank_clean %>%
   mutate(
     # Numeric target for aggregation (Poisson)
@@ -369,13 +381,11 @@ lm_fit <- lm(
   log_balance ~ age + job + education_num + housing + loan + marital + default,
   data = bank_model
 )
-
-summary(lm_fit)
 ```
 
 ## 6.2 Coefficient interpretation
 
-```{r lm-coef}
+```{r lm-coef, results='asis'}
 broom::tidy(lm_fit, conf.int = TRUE) %>%
   filter(term != "(Intercept)") %>%
   mutate(
@@ -400,7 +410,7 @@ broom::tidy(lm_fit, conf.int = TRUE) %>%
 
 ## 6.3 Diagnostics
 
-```{r lm-diag}
+```{r lm-diag, fig.height=4.5}
 par(mfrow = c(2, 2))
 plot(lm_fit)
 par(mfrow = c(1, 1))
@@ -412,13 +422,15 @@ sample size and the presence of very high-balance clients.
 
 ## 6.4 Performance
 
-```{r lm-perf}
-cat("R-squared:       ", round(summary(lm_fit)$r.squared, 4), "\n")
-cat("RMSE (log scale):", round(sqrt(mean(lm_fit$residuals^2)), 4), "\n")
+```{r lm-perf, results='markup'}
+cat(
+  "R-squared:        ", round(summary(lm_fit)$r.squared, 4), "\n",
+  "RMSE (log scale): ", round(sqrt(mean(lm_fit$residuals^2)), 4), "\n"
+)
 ```
 The R² of `r round(summary(lm_fit)$r.squared, 3)` indicates that demographic and financial variables explain a moderate share of balance variation. Job type and education are the strongest contributors, confirming that client profile matters more than individual loan status for predicting overall wealth.
 
-```{r lm-save, results='hide'}
+```{r lm-save, include=FALSE}
 saveRDS(lm_fit, "../models/lm_fit.rds")
 cat("Saved: ../models/lm_fit.rds\n")
 ```
@@ -435,7 +447,7 @@ group size so we model the **rate** not the raw count.
 
 ## 7.1 Aggregate data
 
-```{r poisson-agg}
+```{r poisson-agg, results='hide'}
 bank_agg <- bank_model %>%
   group_by(age_group, education, housing) %>%
   summarise(
@@ -444,25 +456,21 @@ bank_agg <- bank_model %>%
     .groups          = "drop"
   ) %>%
   filter(n >= 10)
-
-head(bank_agg, 10)
-cat("Aggregated groups:", nrow(bank_agg), "\n")
 ```
 
 ## 7.2 Fit
 
-```{r poisson-fit, cache=TRUE}
+```{r poisson-fit, cache=TRUE, results='hide'}
 poisson_fit <- glm(
   subscribed_count ~ age_group + education + housing + offset(log(n)),
   data   = bank_agg,
   family = poisson(link = "log")
 )
-summary(poisson_fit)
 ```
 
 ## 7.3 Rate ratios
 
-```{r poisson-coef}
+```{r poisson-coef, results='asis'}
 broom::tidy(poisson_fit, conf.int = TRUE) %>%
   filter(term != "(Intercept)") %>%
   mutate(
@@ -510,17 +518,16 @@ ggplot(bank_agg,
 
 ## 7.5 Model fit
 
-```{r poisson-fit-stats}
-cat("Null deviance:     ", round(poisson_fit$null.deviance, 1),
-    "on", poisson_fit$df.null, "df\n")
-cat("Residual deviance: ", round(poisson_fit$deviance, 1),
-    "on", poisson_fit$df.residual, "df\n")
-cat("AIC:", round(AIC(poisson_fit), 1), "\n")
-cat("McFadden pseudo-R2:",
-    round(1 - poisson_fit$deviance / poisson_fit$null.deviance, 3), "\n")
+```{r poisson-fit-stats, results='markup'}
+cat(
+  "Null deviance:     ", round(poisson_fit$null.deviance, 1), "on", poisson_fit$df.null, "df\n",
+  "Residual deviance: ", round(poisson_fit$deviance, 1), "on", poisson_fit$df.residual, "df\n",
+  "AIC:               ", round(AIC(poisson_fit), 1), "\n",
+  "McFadden pseudo-R2:", round(1 - poisson_fit$deviance / poisson_fit$null.deviance, 3), "\n"
+)
 ```
 
-```{r poisson-save, results='hide'}
+```{r poisson-save, include=FALSE}
 saveRDS(poisson_fit, "../models/poisson_fit.rds")
 cat("Saved: ../models/poisson_fit.rds\n")
 ```
