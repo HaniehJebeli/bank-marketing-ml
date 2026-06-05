@@ -30,7 +30,7 @@ library(scales)
 
 The dataset comes from the UCI Machine Learning Repository and contains records
 of **45,211 phone marketing calls** made by a Portuguese bank between May 2008
-and November 2010. Each row represents one call to one client, with 16 features
+and November 2010. Each row represents one call to one client, with 17 features
 describing the client's profile, the campaign contact history, and the outcome
 of previous campaigns.
 
@@ -49,7 +49,7 @@ reducing cost and improving conversion rates.
 
 *Section lead: Hanieh Jebeli*
 
-```{r load-data}
+```{r load-data, results='hide'}
 # File uses semicolons as separator
 bank_raw <- read.csv("../data/bank-full.csv", sep = ";")
 
@@ -74,9 +74,9 @@ The raw dataset has **`r nrow(bank_raw)` rows** and **`r ncol(bank_raw)` columns
 | `day`      | Continuous  | Last contact day of month                                     |
 | `month`    | Categorical | Last contact month (jan-dec)                                  |
 | `duration` | Continuous  | Last call duration in seconds                                 |
-| `campaign` | **Count**   | Number of contacts during this campaign                       |
+| `campaign` | Count       | Number of contacts during this campaign                       |
 | `pdays`    | Continuous  | Days since last contact (-1 = never contacted before)        |
-| `previous` | **Count**   | Number of contacts before this campaign                       |
+| `previous` | Count       | Number of contacts before this campaign                       |
 | `poutcome` | Categorical | Outcome of previous campaign (success, failure, other, unknown)|
 | `y`        | Binary      | **Target** - subscribed? (yes/no)                            |
 
@@ -197,9 +197,7 @@ The classes are **imbalanced** - around 88% did not subscribe and 12% did.
 This is realistic for marketing data and will need to be considered when
 evaluating model performance (accuracy alone is not enough - we will use AUC).
 
-## 3.5 Save cleaned data for teammates
-
-```{r save}
+```{r save, include=FALSE}
 saveRDS(bank_clean, "../data/bank_clean.rds")
 cat("Saved: ../data/bank_clean.rds\n")
 cat("Enerel and Aurelio: load with readRDS('../data/bank_clean.rds')\n")
@@ -357,7 +355,7 @@ of response.
 
 ## 6.1 Fit
 
-```{r lm-fit, cache=TRUE, results='hide'}
+```{r lm-fit, cache=TRUE}
 lm_fit <- lm(
   log_balance ~ age + job + education_num + housing + loan + marital + default,
   data = bank_model
@@ -410,9 +408,7 @@ cat("R-squared:       ", round(summary(lm_fit)$r.squared, 4), "\n")
 cat("RMSE (log scale):", round(sqrt(mean(lm_fit$residuals^2)), 4), "\n")
 ```
 
-## 6.5 Save model
-
-```{r lm-save}
+```{r lm-save, results='hide'}
 saveRDS(lm_fit, "../models/lm_fit.rds")
 cat("Saved: ../models/lm_fit.rds\n")
 ```
@@ -514,9 +510,7 @@ cat("McFadden pseudo-R2:",
     round(1 - poisson_fit$deviance / poisson_fit$null.deviance, 3), "\n")
 ```
 
-## 7.6 Save model
-
-```{r poisson-save}
+```{r poisson-save, results='hide'}
 saveRDS(poisson_fit, "../models/poisson_fit.rds")
 cat("Saved: ../models/poisson_fit.rds\n")
 ```

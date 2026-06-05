@@ -37,15 +37,13 @@ glimpse(bank_clean)
 
 *Section lead: Enerel Khuyag*
 
-## 9.1 Motivation
-
 Since the response variable **subscribed** is binary (Yes/No), a **Binomial GLM
 with a logit link** is the natural modelling choice. Unlike a plain linear model,
 it constrains predicted values to the (0, 1) probability range and models the
 **log-odds** of subscription as a linear combination of predictors. This makes
 the coefficients directly interpretable as odds ratios after exponentiation.
 
-## 9.2 Train/Test Split
+## 9.1 Train/Test Split
 
 To evaluate the model on unseen data we use the same 80/20 stratified split
 strategy as Aurelio's section, ensuring comparable performance metrics across all models.
@@ -66,9 +64,9 @@ cat("Subscription rate (train):", round(mean(bank_train$subscribed == "Yes"), 3)
 cat("Subscription rate (test): ", round(mean(bank_test$subscribed  == "Yes"), 3), "\n")
 ```
 
-## 9.3 Model Fitting
+## 9.2 Model Fitting
 
-```{r glm-fit, results='hide'}
+```{r glm-fit}
 glm_fit <- glm(
   subscribed_bin ~ age + job + marital + education +
                    default + balance + housing + loan +
@@ -83,7 +81,7 @@ saveRDS(glm_fit, "../models/binomial_fit.rds")
 summary(glm_fit)
 ```
 
-## 9.4 Coefficient Interpretation
+## 9.3 Coefficient Interpretation
 
 ```{r glm-coef}
 tidy(glm_fit, exponentiate = TRUE, conf.int = TRUE) %>%
@@ -127,7 +125,7 @@ tidy(glm_fit, exponentiate = TRUE, conf.int = TRUE) %>%
   theme_minimal()
 ```
 
-## 9.5 Model Evaluation
+## 9.4 Model Evaluation
 
 ```{r glm-eval}
 pred_prob_glm  <- as.vector(predict(glm_fit, newdata = bank_test, type = "response"))
@@ -181,7 +179,7 @@ ggroc(roc_glm, colour = "steelblue", size = 1) +
   theme_minimal()
 ```
 
-## 9.6 Discussion
+## 9.5 Discussion
 
 The Binomial GLM provides a strong, interpretable baseline for predicting
 subscription. The AUC indicates good discriminative power, and the coefficients
@@ -195,14 +193,12 @@ which the GAM below relaxes.
 
 *Section lead: Enerel Khuyag*
 
-## 10.1 Motivation
-
 The Binomial GLM assumes that predictors like `age`, `balance`, and `campaign`
 affect the log-odds **linearly**. A **GAM** replaces these linear terms with
 flexible smooth spline functions fitted from the data, allowing the model to
 capture non-linear relationships automatically.
 
-## 10.2 Model Fitting
+## 10.1 Model Fitting
 
 ```{r gam-fit, results='hide'}
 gam_fit <- gam(
@@ -220,7 +216,7 @@ saveRDS(gam_fit, "../models/gam_fit.rds")
 summary(gam_fit)
 ```
 
-## 10.3 Smooth Term Plots
+## 10.2 Smooth Term Plots
 
 ```{r gam-plots, fig.height=8, fig.cap="Estimated smooth effects on log-odds of subscription"}
 par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
@@ -242,7 +238,7 @@ par(mfrow = c(1, 1))
 
 - **`s(previous)`**: Clients with 1–3 prior contacts show higher subscription rates.
 
-## 10.4 Model Evaluation
+## 10.3 Model Evaluation
 
 ```{r gam-eval}
 pred_prob_gam  <- as.vector(predict(gam_fit, newdata = bank_test, type = "response"))
@@ -286,7 +282,7 @@ as.data.frame(cm_gam$table) %>%
   theme(legend.position = "none")
 ```
 
-## 10.5 GLM vs GAM Comparison
+## 10.4 GLM vs GAM Comparison
 
 ```{r compare-roc, fig.cap="ROC curves: Binomial GLM vs GAM"}
 ggroc(list(GLM = roc_glm, GAM = roc_gam), size = 1) +
