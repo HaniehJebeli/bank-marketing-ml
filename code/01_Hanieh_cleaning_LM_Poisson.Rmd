@@ -536,23 +536,6 @@ cat("Saved: ../models/poisson_fit.rds\n")
 
 # 8. Summary
 
-The data cleaning removed rows with impossible campaign counts and zero-duration
-calls, leaving a clean dataset of **`r nrow(bank_clean)`** records. EDA confirmed
-that call duration, age, job type, and previous campaign outcome are the strongest
-predictors of subscription.
+The data cleaning removed rows with impossible campaign counts and zero-duration calls, leaving a clean dataset of **`r nrow(bank_clean)`** records. EDA confirmed that call duration, age, job type, and previous campaign outcome are the strongest predictors of subscription.
 
-The **Linear Model** showed that job type, education, and loan status are
-significantly associated with balance. Management and tertiary-educated clients
-hold substantially higher balances — these are financially stronger profiles
-more likely to have capacity to invest.
-
-The **Poisson GLM** revealed a U-shaped age effect: clients under 30 and
-above 60 subscribe at the highest rates. Education amplifies this effect —
-tertiary-educated clients across all age groups subscribe more. Housing loans
-consistently reduce subscription rates, suggesting that existing financial
-commitments are a key barrier.
-
-Together, these two models suggest that the bank should prioritise young and
-older clients with higher education and no housing loan — and be cautious about
-over-contacting middle-aged clients who are the least responsive segment.
 
