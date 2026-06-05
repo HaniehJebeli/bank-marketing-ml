@@ -64,9 +64,9 @@ cat("Subscription rate (train):", round(mean(bank_train$subscribed == "Yes"), 3)
 cat("Subscription rate (test): ", round(mean(bank_test$subscribed  == "Yes"), 3), "\n")
 ```
 
-## 9.2 Model Fitting
+## 9.3 Model Fitting
 
-```{r glm-fit, results='hide'}
+```{r glm-fit}
 glm_fit <- glm(
   subscribed_bin ~ age + job + marital + education +
                    default + balance + housing + loan +
@@ -81,7 +81,7 @@ saveRDS(glm_fit, "../models/binomial_fit.rds")
 summary(glm_fit)
 ```
 
-## 9.3 Coefficient Interpretation
+## 9.4 Coefficient Interpretation
 
 ```{r glm-coef}
 tidy(glm_fit, exponentiate = TRUE, conf.int = TRUE) %>%
@@ -125,7 +125,7 @@ tidy(glm_fit, exponentiate = TRUE, conf.int = TRUE) %>%
   theme_minimal()
 ```
 
-## 9.4 Model Evaluation
+## 9.5 Model Evaluation
 
 ```{r glm-eval}
 pred_prob_glm  <- as.vector(predict(glm_fit, newdata = bank_test, type = "response"))
@@ -179,7 +179,7 @@ ggroc(roc_glm, colour = "steelblue", size = 1) +
   theme_minimal()
 ```
 
-## 9.5 Discussion
+## 9.6 Discussion
 
 The Binomial GLM provides a strong, interpretable baseline for predicting
 subscription. The AUC indicates good discriminative power, and the coefficients
@@ -310,7 +310,7 @@ tibble(
 ) %>% kable(caption = "Binomial GLM vs GAM — side-by-side comparison")
 ```
 
-## 10.6 Discussion
+## 10.5 Discussion
 
 The GAM captures non-linear effects the Binomial GLM misses — particularly the
 U-shaped age effect and diminishing returns for campaign contacts. For **model

@@ -40,14 +40,12 @@ Support Vector Machines are well-suited for binary classification tasks. Our tar
 
 # 11.1 Feature Selection
 
-...
+Several variables are dropped before model training. duration is excluded since call duration is only known after a call is made, it cannot be used to predict subscription in a real deployment. The remaining dropped variables (pdays_clean, prev_contacted, balance_shifted, log_balance) are engineered features created for earlier modelling sections that are not needed.
 
 ```{r feature-selection,}
 bank_clean <- bank_clean %>% 
   select(-duration, -pdays_clean, -prev_contacted, -balance_shifted, -log_balance)
 ```
-
----
 
 ## 11.2 Train/Test Split
 
@@ -98,7 +96,7 @@ tune_grid <- expand.grid(
 
 ## 11.5 Training
 
-In the training, the model is evaluated using the 5-fold cross validation and grid search defined earlier. The combination that achieves the highest ROC is automatically selected as the final model. In total, 100 models are trained and compared in this process. Because of the class imbalance, a weighting was also added. Due to the computational demands of training a model 100 times on a large dataset, only a stratified 30% subsample of **bank_train** was used for to speed up the process.
+In the training, the model is evaluated using the 5-fold cross validation and grid search defined earlier. The combination that achieves the highest ROC is automatically selected as the final model. In total, 100 models are trained and compared in this process. Because of the class imbalance, a weighting was also added. Due to the computational demands of training a model 100 times on a large dataset, only a stratified 30% subsample of **bank_train** was used to speed up the process.
 
 **Model:** svm(subscribed ~ . , data = bank_train_small, kernel = "radial", gamma = x, cost = y), 
 
@@ -133,13 +131,13 @@ plot(bank_svm)
 
 ## 11.6 Evaluting
 
-The SVM model achieved an overall accuracy of 89.2%, which appears strong at first glance but is misleading given the class imbalance in the dataset, because if the model would classify all data points as "No", it would also achieve an accuracy of around 88%. The balanced accuracy of 0.567 — barely above the random guessing baseline of 0.5 — reveals the model's true weakness. While the model correctly identifies 99.1% of non-subscribers (Sensitivity), it only identifies 14.2% of actual subscribers (Specificity), meaning it misses approximately 86% of clients who would have agreed to a term deposit. This is reflected in the AUC of 0.726, indicating only fair discriminative ability between the two classes.
+The SVM model achieved an overall accuracy of 89.2%, which appears strong at first glance but is misleading given the class imbalance in the dataset, because if the model would classify all data points as "No", it would also achieve an accuracy of around 88%. The balanced accuracy of 0.567 — barely above the random guessing baseline of 0.5 — reveals the model's true weakness. While the model correctly identifies 99.1% of non-subscribers (Specificity), it only identifies 14.2% of actual subscribers (Sensitivity), meaning it misses approximately 86% of clients who would have agreed to a term deposit. This is reflected in the AUC of 0.726, indicating only fair discriminative ability between the two classes.
 
 ```{r evaluate-svm}
 pred_svm <- factor(as.character(predict(bank_svm, bank_test)),
                    levels = c("No", "Yes"))
 
-cm_svm <- confusionMatrix(pred_svm, bank_test_truth)
+cm_svm <- confusionMatrix(pred_svm, bank_test_truth, positive = "Yes")
 
 pred_svm_prob <- predict(bank_svm, bank_test, type = "prob")
 roc_svm       <- roc(bank_test_truth, pred_svm_prob[, "Yes"])
@@ -227,7 +225,7 @@ From a business perspective, the confusion matrix reveals a more nuanced picture
 pred_nnt <- factor(as.character(predict(bank_nnt, bank_test, type = "class")),
                    levels = c("No", "Yes"))
 
-cm_nnt <- confusionMatrix(pred_nnt, bank_test_truth)
+cm_nnt <- confusionMatrix(pred_nnt, bank_test_truth, positive = "Yes")
 
 pred_nnt_prob <- predict(bank_nnt, bank_test, type = "raw")
 roc_nnt       <- roc(bank_test_truth, pred_nnt_prob[, 1])
@@ -286,17 +284,32 @@ cat("Saved: ../models/nn_fit.rds\n")
 
 # 13. AI Usage
 
-*Section lead: Aurelio Wyrsch*
+### Hanieh Jebeli
 
 AI mainly helped with structuring the data cleaning process and speeding up coding tasks such as factor recoding and mutate() operations. It was also useful for understanding concepts like the offset term in the Poisson GLM, which I then verified using the course materials.
 Some suggestions required manual checking. For example, AI initially recommended a log transformation of balance without considering negative values, so I adjusted the approach by creating a shifted balance variable.
+
+### Eneral Khuyag
+
+...
+
+### Aurelio Wyrsch
+
 ...
 
 ---
 
 # 14. Conclusion
 
-*Section lead: Aurelio Wyrsch*
+LM ...
 
-...
+GLM ...
+
+Binomial GLM, GAM, SVM and NN ...
+
+
+
+
+
+
 
