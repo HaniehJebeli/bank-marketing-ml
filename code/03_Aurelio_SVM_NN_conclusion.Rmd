@@ -217,9 +217,7 @@ bank_nnt <- nnet(subscribed ~ . , data = bank_train, size = 8, decay = 0.1, maxi
 
 ## 12.2 Evaluating
 
-At a first glance, it looks like the neural network performed worse than the SVM, because the accuracy is now only 80.1%. Also the sensitivity is less with only 82.2% compared to 99.1% from SVM. However, the neural network outperforms the SVM across the other metrics, confirming that it is better suited for this classification task. The balanced accuracy of 0.734 represents a substantial improvement over the SVM's 0.567, indicating the model is now meaningfully distinguishing between subscribers and non-subscribers rather than defaulting to the majority class. As mentioned, he sensitivity of the model correctly identifies 82.2% of non-subscribers, while the specificity now successfully catches 64.6% of actual subscribers — a dramatic improvement over the SVM's 14.2%.
-
-From a business perspective, the confusion matrix reveals a more nuanced picture. Of the 2,105 clients the model flagged as likely subscribers, 683 were true positives (actual subscribers) and 1,422 were false positives (non-subscribers incorrectly identified as likely subscribers), yielding a precision of approximately 32%. While this may seem low, it still represents a meaningful improvement over random targeting. In the original dataset, only 1 in 7 clients (12%) actually subscribed — by focusing exclusively on the clients flagged by the model, the bank would expect a successful call roughly every 3 attempts, more than doubling the baseline conversion rate. This means the model, despite its limitations, can still add practical value by helping the bank allocate its marketing resources more efficiently and reduce the number of unproductive calls.
+At a first glance, it looks like the neural network performed worse than the SVM, because the accuracy is now only 80.1%. Also the specificity is less with only 82.2% compared to 99.1% from SVM. However, the neural network outperforms the SVM across the other metrics, confirming that it is better suited for this classification task. The balanced accuracy of 0.734 represents a substantial improvement over the SVM's 0.567, indicating the model is now meaningfully distinguishing between subscribers and non-subscribers rather than defaulting to the majority class. As mentioned, the specificity of the model correctly identifies 82.2% of non-subscribers, while the sensitivity now successfully catches 64.6% of actual subscribers — a dramatic improvement over the SVM's 14.2%.
 
 ```{r evaluate-nnt}
 pred_nnt <- factor(as.character(predict(bank_nnt, bank_test, type = "class")),
@@ -295,7 +293,7 @@ Some suggestions required manual checking. For example, AI initially recommended
 
 ### Aurelio Wyrsch
 
-...
+AI was primarily used to speed up repetitive coding tasks such as writing visualisations and evaluation chunks consistently across model sections. It was also helpful for answering small implementation questions. Every AI-generated solution was manually reviewed and tested before being included in the report. This was done because some suggestions were incorrect or did not fit the specific context of the data.
 
 ---
 
@@ -305,7 +303,11 @@ LM ...
 
 GLM ...
 
-Binomial GLM, GAM, SVM and NN ...
+All four classification models were evaluated on the same held-out test set. The Binomial GLM and GAM performed similarly, achieving high accuracy (89%) but very low sensitivity (17–18%), meaning they correctly identified only a small fraction of actual subscribers. This is a direct consequence of the class imbalance — without any adjustment, both models default to predicting "No" for the vast majority of clients. The SVM, despite using class weights, showed similarly poor sensitivity (14.2%) and the lowest AUC (0.729), likely due to being trained on only 30% of the training data for computational reasons.
+
+The Neural Network was the strongest performer overall. By applying class weights during training, it achieved a sensitivity of 64.6% and a balanced accuracy of 0.734 — substantially better than the other three models at identifying actual subscribers. Its AUC of 0.789 also edged out the GAM (0.780) and GLM (0.775). The trade-off is a drop in overall accuracy to 80.1%.
+
+From a business perspective, the Neural Network can clearly improve targeting new subscribers. Of the 2,105 clients the model flagged as likely subscribers, 683 were true positives (actual subscribers) and 1,422 were false positives (non-subscribers incorrectly identified as likely subscribers), yielding a precision of approximately 32%. While this may seem low, it still represents a meaningful improvement over random targeting. In the original dataset, only 1 in 7 clients (12%) actually subscribed — by focusing exclusively on the clients flagged by the model, the bank would expect a successful call roughly every 3 attempts, more than doubling the baseline conversion rate. This means the model, despite its limitations, can still add practical value by helping the bank allocate its marketing resources more efficiently and reduce the number of unproductive calls.
 
 
 
