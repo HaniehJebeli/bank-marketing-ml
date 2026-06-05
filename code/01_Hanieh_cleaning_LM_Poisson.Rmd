@@ -88,7 +88,7 @@ The raw dataset has **`r nrow(bank_raw)` rows** and **`r ncol(bank_raw)` columns
 
 ## 3.1 Recode and engineer variables
 
-```{r recode}
+```{r recode, results='hide'}
 bank <- bank_raw %>%
   mutate(
     # Target: yes/no -> factor
@@ -355,7 +355,7 @@ of response.
 
 ## 6.1 Fit
 
-```{r lm-fit, cache=TRUE}
+```{r lm-fit, cache=TRUE, results='hide'}
 lm_fit <- lm(
   log_balance ~ age + job + education_num + housing + loan + marital + default,
   data = bank_model

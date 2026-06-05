@@ -66,7 +66,7 @@ cat("Subscription rate (test): ", round(mean(bank_test$subscribed  == "Yes"), 3)
 
 ## 9.2 Model Fitting
 
-```{r glm-fit}
+```{r glm-fit, results='hide'}
 glm_fit <- glm(
   subscribed_bin ~ age + job + marital + education +
                    default + balance + housing + loan +
