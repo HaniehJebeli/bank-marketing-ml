@@ -87,7 +87,7 @@ The raw dataset has **`r nrow(bank_raw)` rows** and **`r ncol(bank_raw)` columns
 *Section lead: Hanieh Jebeli*
 
 ## 3.1 Recode and engineer variables
-
+All character variables are converted to R factors with meaningful labels. Age is kept as-is (already in years). We derive two new variables: `log_balance` for the Linear Model (balance is an amount variable requiring log-transformation) and `pdays_clean` which recodes -1 as NA for clarity.
 ```{r recode, results='hide'}
 bank <- bank_raw %>%
   mutate(
@@ -152,6 +152,7 @@ design - these represent clients who were never contacted before this campaign
 (coded as -1 in the raw data). This is expected and handled correctly.
 
 ## 3.3 Check for outliers
+We remove two types of impossible values: calls with `campaign > 30` (data entry errors) and calls with `duration = 0` (calls that never took place).
 
 ```{r outliers}
 # Campaign: number of contacts - check for unreasonable values
@@ -210,7 +211,7 @@ cat("Enerel and Aurelio: load with readRDS('../data/bank_clean.rds')\n")
 *Section lead: Hanieh Jebeli*
 
 ## 4.1 Subscription rate by job type
-
+We compute the subscription rate per job category and rank them. This reveals which client segments are most receptive to the product.
 ```{r eda-job}
 bank_clean %>%
   group_by(job) %>%
@@ -232,7 +233,7 @@ and services workers show the lowest rates - likely reflecting different
 financial priorities and risk appetites.
 
 ## 4.2 Age and balance distribution by outcome
-
+Boxplots compare the distribution of age and account balance between subscribers and non-subscribers.
 ```{r eda-age-balance}
 p1 <- ggplot(bank_clean, aes(x = subscribed, y = age, fill = subscribed)) +
   geom_boxplot(alpha = 0.7) +
@@ -253,6 +254,7 @@ Subscribers tend to be slightly older and have higher account balances,
 suggesting financial stability is positively associated with subscription.
 
 ## 4.3 Call duration - strongest single predictor
+We plot the distribution of call duration in minutes, split by subscription outcome.
 
 ```{r eda-duration}
 ggplot(bank_clean, aes(x = duration / 60, fill = subscribed)) +
@@ -270,6 +272,8 @@ be used for prediction in a real deployment (we don't know duration before
 calling) - but it is valid for a retrospective analysis.
 
 ## 4.4 Campaign contacts - count variable
+
+We show how subscription rate changes with the number of times a client was contacted during the campaign.
 
 ```{r eda-campaign}
 bank_clean %>%
@@ -289,6 +293,8 @@ times are much less likely to subscribe - diminishing returns are clearly visibl
 
 ## 4.5 Smoother: age vs call duration
 
+A LOESS smoother shows the non-linear relationship between client age and call duration among subscribers.
+
 ```{r eda-smoother}
 ggplot(bank_clean, aes(x = age, y = duration / 60, color = subscribed)) +
   geom_smooth(method = "loess", se = TRUE) +
@@ -299,6 +305,7 @@ ggplot(bank_clean, aes(x = age, y = duration / 60, color = subscribed)) +
 ```
 
 ## 4.6 Correlation matrix
+We compute Pearson correlations among the continuous and count variables to check for multicollinearity.
 
 ```{r eda-corr}
 bank_clean %>%
@@ -314,6 +321,8 @@ multicollinearity is not a major concern for the models.
 ---
 
 # 5. Feature Engineering
+
+We create four derived variables used across all models: a binary numeric target for aggregation, age groups for the Poisson model, duration in minutes for readability, and education as a numeric scale for the Linear Model.
 
 *Section lead: Hanieh Jebeli*
 
@@ -407,6 +416,7 @@ sample size and the presence of very high-balance clients.
 cat("R-squared:       ", round(summary(lm_fit)$r.squared, 4), "\n")
 cat("RMSE (log scale):", round(sqrt(mean(lm_fit$residuals^2)), 4), "\n")
 ```
+The R² of `r round(summary(lm_fit)$r.squared, 3)` indicates that demographic and financial variables explain a moderate share of balance variation. Job type and education are the strongest contributors, confirming that client profile matters more than individual loan status for predicting overall wealth.
 
 ```{r lm-save, results='hide'}
 saveRDS(lm_fit, "../models/lm_fit.rds")
@@ -520,14 +530,22 @@ cat("Saved: ../models/poisson_fit.rds\n")
 # 8. Summary
 
 The data cleaning removed rows with impossible campaign counts and zero-duration
-calls. The exploratory analysis confirmed that call duration, age, job type,
-and previous campaign outcome are the strongest predictors of subscription.
+calls, leaving a clean dataset of **`r nrow(bank_clean)`** records. EDA confirmed
+that call duration, age, job type, and previous campaign outcome are the strongest
+predictors of subscription.
 
 The **Linear Model** showed that job type, education, and loan status are
-significantly associated with account balance, with management-level and
-tertiary-educated clients holding substantially higher balances.
+significantly associated with balance. Management and tertiary-educated clients
+hold substantially higher balances — these are financially stronger profiles
+more likely to have capacity to invest.
 
-The **Poisson GLM** revealed that younger and older clients have higher
-subscription rates, tertiary education is positively associated with
-subscription, and having a housing loan reduces it.
+The **Poisson GLM** revealed a U-shaped age effect: clients under 30 and
+above 60 subscribe at the highest rates. Education amplifies this effect —
+tertiary-educated clients across all age groups subscribe more. Housing loans
+consistently reduce subscription rates, suggesting that existing financial
+commitments are a key barrier.
+
+Together, these two models suggest that the bank should prioritise young and
+older clients with higher education and no housing loan — and be cautious about
+over-contacting middle-aged clients who are the least responsive segment.
 
