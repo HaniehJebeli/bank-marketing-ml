@@ -376,7 +376,7 @@ of response.
 **Model:** lm(log_balance ~ age + job + education_num + housing + loan + marital + default)
 
 ## 6.1 Fit
-
+We fit the linear model using all selected demographic and financial predictors. The model is fitted on `bank_model` which contains the log-transformed balance and the numeric education scale created in the feature engineering step.
 ```{r lm-fit, cache=TRUE, results='hide'}
 lm_fit <- lm(
   log_balance ~ age + job + education_num + housing + loan + marital + default,
