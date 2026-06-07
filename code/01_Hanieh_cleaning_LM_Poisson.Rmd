@@ -333,10 +333,11 @@ multicollinearity is not a major concern for the models.
 ---
 
 # 5. Feature Engineering
+*Section lead: Hanieh Jebeli*
 
 We create four derived variables used across all models: a binary numeric target for aggregation, age groups for the Poisson model, duration in minutes for readability, and education as a numeric scale for the Linear Model.
 
-*Section lead: Hanieh Jebeli*
+
 
 ```{r features, results='hide'}
 bank_model <- bank_clean %>%
@@ -385,6 +386,8 @@ lm_fit <- lm(
 
 ## 6.2 Coefficient interpretation
 
+The table below shows the estimated coefficients, their confidence intervals, and the percentage change in balance associated with each predictor.
+
 ```{r lm-coef, results='asis'}
 broom::tidy(lm_fit, conf.int = TRUE) %>%
   filter(term != "(Intercept)") %>%
@@ -410,17 +413,21 @@ broom::tidy(lm_fit, conf.int = TRUE) %>%
 
 ## 6.3 Diagnostics
 
+We check the four standard linear model diagnostic plots: residuals vs fitted values (checking linearity), Q-Q plot (checking normality of residuals), scale-location (checking homoscedasticity), and residuals vs leverage (checking for influential observations).
+
 ```{r lm-diag, fig.height=4.5}
 par(mfrow = c(2, 2))
 plot(lm_fit)
 par(mfrow = c(1, 1))
 ```
 
-The log transformation substantially improves residual normality compared to
+The log transformation improves residual normality compared to
 using raw balance. Some deviation at the tails is expected given the large
 sample size and the presence of very high-balance clients.
 
 ## 6.4 Performance
+
+We report R² and RMSE on the log scale. R² measures the proportion of variance in log(balance) explained by the predictors, while RMSE gives the average prediction error in log units.
 
 ```{r lm-perf, results='markup'}
 cat(
@@ -446,7 +453,7 @@ of clients who subscribed** in each group. The offset log(n) adjusts for
 group size so we model the **rate** not the raw count.
 
 ## 7.1 Aggregate data
-
+We group the data by age group, education level, and housing loan status, then count how many clients subscribed in each cell. Groups with fewer than 10 observations are removed to avoid unstable rate estimates in small cells.
 ```{r poisson-agg, results='hide'}
 bank_agg <- bank_model %>%
   group_by(age_group, education, housing) %>%
@@ -459,6 +466,7 @@ bank_agg <- bank_model %>%
 ```
 
 ## 7.2 Fit
+We fit the Poisson GLM with a log link. The `offset(log(n))` term ensures that we model the subscription rate per client rather than the raw count without it.
 
 ```{r poisson-fit, cache=TRUE, results='hide'}
 poisson_fit <- glm(
@@ -497,6 +505,7 @@ broom::tidy(poisson_fit, conf.int = TRUE) %>%
   subscribe, as an existing financial commitment reduces appetite for new products.
 
 ## 7.4 Visualise predicted rates
+We plot the model's predicted subscription rates across age groups, split by education level and faceted by housing loan status. This gives an intuitive picture of how the three predictors interact.
 
 ```{r poisson-viz}
 bank_agg$predicted_rate <- predict(poisson_fit, type = "response") / bank_agg$n
@@ -518,6 +527,7 @@ ggplot(bank_agg,
 
 ## 7.5 Model fit
 
+The McFadden pseudo-R² and deviance reduction confirm how well the model improves over a null model that predicts the same rate for every group.
 ```{r poisson-fit-stats, results='markup'}
 cat(
   "Null deviance:     ", round(poisson_fit$null.deviance, 1), "on", poisson_fit$df.null, "df\n",
@@ -536,6 +546,23 @@ cat("Saved: ../models/poisson_fit.rds\n")
 
 # 8. Summary
 
-The data cleaning removed rows with impossible campaign counts and zero-duration calls, leaving a clean dataset of **`r nrow(bank_clean)`** records. EDA confirmed that call duration, age, job type, and previous campaign outcome are the strongest predictors of subscription.
+The data cleaning removed rows with impossible campaign counts and zero-duration
+calls, leaving a clean dataset of **`r nrow(bank_clean)`** records. EDA confirmed
+that call duration, age, job type, and previous campaign outcome are the strongest
+predictors of subscription.
 
+The **Linear Model** showed that job type, education, and loan status are
+significantly associated with balance. Management and tertiary-educated clients
+hold substantially higher balances — these are financially stronger profiles
+more likely to have capacity to invest.
+
+The **Poisson GLM** revealed a U-shaped age effect: clients under 30 and
+above 60 subscribe at the highest rates. Education amplifies this effect —
+tertiary-educated clients across all age groups subscribe more. Housing loans
+consistently reduce subscription rates, suggesting that existing financial
+commitments are a key barrier.
+
+Together, these two models suggest that the bank should prioritise young and
+older clients with higher education and no housing loan — and be cautious about
+over-contacting middle-aged clients who are the least responsive segment.
 
