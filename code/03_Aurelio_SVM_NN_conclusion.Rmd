@@ -287,9 +287,11 @@ cat("Saved: ../models/nn_fit.rds\n")
 AI mainly helped with structuring the data cleaning process and speeding up coding tasks such as factor recoding and mutate() operations. It was also useful for understanding concepts like the offset term in the Poisson GLM, which I then verified using the course materials.
 Some suggestions required manual checking. For example, AI initially recommended a log transformation of balance without considering negative values, so I adjusted the approach by creating a shifted balance variable.
 
-### Eneral Khuyag
 
-...
+### Enerel Khuyag
+
+AI was mainly used to support coding, debugging, and interpretation throughout the Binomial GLM and GAM sections. It helped speed up repetitive R tasks such as generating evaluation metrics, plotting ROC curves, formatting model outputs, and troubleshooting modelling or package-related errors. AI was also used to better understand the theoretical differences between GLMs and GAMs and to improve the clarity of model interpretations and explanations.
+
 
 ### Aurelio Wyrsch
 
