@@ -83,7 +83,7 @@ ctrl_svm <- trainControl(
 )
 ```
 
-## 11.4 Hyperparameter Tuneing
+## 11.4 Hyperparameter Tuning
 
 To optimize the SVM's performance, we tune two hyperparameters using a grid search. The grid search tests 20 combinations across cost = (0.01, 0.05, 0.1, 0.5, 1) and gamma = (0.05, 0.1, 0.5, 1), training and evaluating a separate model for each combination.
 
