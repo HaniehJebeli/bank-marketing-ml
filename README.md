@@ -137,7 +137,7 @@ lm_fit <- readRDS("../models/lm_fit.rds")
 ## Git Workflow
 
 ```bash
-git clone https://github.com/HaniehJebeli/AML.git
+git clone https://github.com/HaniehJebeli/bank-marketing-ml.git
 git checkout -b Hanieh    # or Enerel / Aurelio
 
 git add code/01_Hanieh_cleaning_LM_Poisson.Rmd
